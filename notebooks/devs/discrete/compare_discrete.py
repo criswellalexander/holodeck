@@ -20,8 +20,9 @@ class Discrete:
         self.lbl = lbl
         self.fname = self.attrs[0]
         self.basepath = self.attrs[1]
-        self.color = self.attrs[2]
-        self.lw = self.attrs[3]
+        self.minNparts = self.attrs[2]
+        self.color = self.attrs[3]
+        self.lw = self.attrs[4]
         self.fixed_sepa = fixed_sepa
         self.tau = tau
         self.nreals = nreals
@@ -343,25 +344,30 @@ def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True,
         all_fsa_dpops = []
         tng_fsa_dpops = []
         
-    # ---- Define dpop attributes: (filename, filepath, plot color, plot linewidth)    
+    # ---- Define dpop attributes: (filename, filepath, minNparts, plot color, plot linewidth)    
     #tpath = '/orange/lblecha/IllustrisTNG/Runs/'
     #ipath = '/orange/lblecha/Illustris/'
     dpop_attrs = {
-        #'Ill-1-N010-bh0' : ('galaxy-mergers_Illustris-1_gas-000_dm-000_star-010_bh-000.hdf5', fpath, 'darkgreen', 1.5),
+        'Ill-1-N010-bh0' : ('galaxy-mergers_Illustris-1_gas-000_dm-000_star-010_bh-000.hdf5', fpath, 
+                            np.array([0,0,0,0,1,0]).astype('int64'), 'darkgreen', 1.5),
         #'Ill-1-bh0' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'g', 1.5),
-        'Ill-1' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'g', 2.5),
+        'Ill-1' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 
+                   np.array([100,100,0,0,100,1]).astype('int64'), 'g', 2.5),
         #'TNG50-1-N100' : ('galaxy-mergers_TNG50-1_gas-100_dm-100_star-100_bh-001.hdf5',  fpath, 'darkred', 4),
         #'TNG50-1-N100-bh0' : ('galaxy-mergers_TNG50-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'darkred', 3),
         #'TNG50-1-bh0' : ('galaxy-mergers_TNG50-1_gas-800_dm-800_star-800_bh-000.hdf5', fpath, 'r', 2.5),
-        'TNG50-1' : ('galaxy-mergers_TNG50-1_gas-800_dm-800_star-800_bh-001.hdf5', fpath, 'r', 3.5),
+        #'TNG50-1' : ('galaxy-mergers_TNG50-1_gas-800_dm-800_star-800_bh-001.hdf5', fpath, 
+        #             np.array([800,800,0,0,800,1]).astype('int64')'r', 3.5),
         #'TNG50-2' : ('galaxy-mergers_TNG50-2_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'orange', 2.5),
         #'TNG50-3' : ('galaxy-mergers_TNG50-3_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 'y', 1.5),
         #'TNG100-1-N010-bh0' : ('galaxy-mergers_TNG100-1_gas-000_dm-000_star-010_bh-000.hdf5', fpath, 'darkblue', 2.5),
         #'TNG100-1-bh0' : ('galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'b', 1.5),
-        'TNG100-1' : ('galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'b', 2.5),
+        #'TNG100-1' : ('galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 
+        #              np.array([100,100,0,0,100,1]).astype('int64'), 'b', 2.5),
         #'TNG100-2' : ('galaxy-mergers_TNG100-2_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 'c', 1.5),
         #'TNG300-1-bh0' : ('galaxy-mergers_TNG300-1_gas-012_dm-012_star-012_bh-000.hdf5', fpath, 'm', 1.0),
-        'TNG300-1' : ('galaxy-mergers_TNG300-1_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 'm', 1.5),
+        #'TNG300-1' : ('galaxy-mergers_TNG300-1_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 
+        #              np.array([12,12,0,0,12,1]).astype('int64'), 'm', 1.5),
         #'TNG300-1-N100' : ('galaxy-mergers_TNG300-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'pink', 1.5),
         #'TNG300-1-N100-bh0' : ('galaxy-mergers_TNG300-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'pink', 1)
         ##---'oldIll' : (None, 'brown', 2.5),
@@ -419,7 +425,7 @@ def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True,
                 all_fsa_dpops = all_fsa_dpops + [dp_fsa]
                 tng_fsa_dpops = tng_fsa_dpops + [rescale_dp_fsa]
 
-        print(f"{l} dpop_attrs: {dpop_attrs[l][0]} {dpop_attrs[l][1]} {dpop_attrs[l][2]} {dpop_attrs[l][3]}")
+        print(f"{l} dpop_attrs: {dpop_attrs[l][0]} {dpop_attrs[l][1]} {dpop_attrs[l][2]} {dpop_attrs[l][3]} {dpop_attrs[l][4]}")
 
     
     if fsa is not None:
