@@ -724,7 +724,7 @@ def run_model(
     sam : :class:`holodeck.sams.sam.Semi_Analytic_Model` instance,
     hard : :class:`holodeck.hardening._Hardening` subclass instance,
     pta_dur : float, [seconds]
-        Duration of PTA observations in seconds, used to determine Nyquist frequency basis at which
+        Duration of PTA observations in years, used to determine Nyquist frequency basis at which
         GW signatures are calculated.
     nfreqs : int
         Number of Nyquist frequency bins at which to calculate GW signatures.
