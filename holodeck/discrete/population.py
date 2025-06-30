@@ -460,6 +460,14 @@ class Pop_Illustris(_Population_Discrete):
             raise ValueError(f"Invalid keyword value: {self._subhalo_mstar_defn=}. "
                              f"Must be 'SubhaloMassType', 'SubhaloMassInRadType', or 'MaxPastMass'")
 
+        print("\n***CHECKING for sepa=0***")
+        if self.sepa.min() > 0.0:
+            print("none found!\n")
+        else:
+            print(f"{self.sepa.shape=}, {self.sepa[self.sepa==0].shape=}")
+            print(f"{self.mstar[self.sepa==0,:]}")
+            print(f"{self.mstar_desc[self.sepa==0]}")
+            
         # set the bulge fractions
         if isinstance(self._bfrac, (int,float)):
             if self._bfrac<=0.0 or self._bfrac>1.0:
