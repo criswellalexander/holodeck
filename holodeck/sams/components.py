@@ -65,7 +65,11 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
         return
 
     def mbh_mass_func(self, mbh, redz, mmbulge, scatter=None):
-        """Convert from the GSMF to a MBH mass function (number density), using a given Mbh-Mbulge relation.
+        """
+        !!!!! DEPRICATED: use mbh_mass_func_conv instead !!!!!
+        This function is faster, but less accurate than mbh_mass_func_conv, scatter is not handled effectively.
+        
+        Convert from the GSMF to a MBH mass function (number density), using a given Mbh-Mbulge relation.
 
         Parameters
         ----------
@@ -105,6 +109,50 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
             ndens = holo.utils.scatter_redistribute_densities(mbh, ndens, scatter=scatter)
 
         return ndens
+
+    def mbh_mass_func_conv(self, mbh, redz, mmbulge, scatter=None):
+        """Convert from the GSMF to a MBH mass function (number density), using a given Mbh-Mbulge relation.
+        This version convolves the GSMF with the Mbh-Mbulge relation including scatter.
+        This will very minorly underestimate the number density at the high-mass end, but this is negligible for scatter_dex > 0.2
+
+        Parameters
+        ----------
+        mbh : array_like
+            Blackhole masses at which to evaluate the mass function.
+        redz : array_like
+            Redshift(s) at which to evaluate the mass function.
+        mmbulge : `relations._MMBulge_Relation` subclass instance
+            Scaling relation between galaxy and MBH masses.
+        scatter : None, bool, or float
+            Introduce scatter in masses.
+            * `None` or `True` : use the value from `mmbulge._scatter_dex`
+            * `False` : do not introduce scatter
+            * float : introduce scatter with this amplitude (in dex)
+
+        Returns
+        -------
+        ndens : array_like
+            Number density of MBHs, in units of [Mpc^-3]
+
+        """
+        if scatter in [None, True]:
+            scatter = np.log10(10**mmbulge._scatter_dex * (1.0 + redz)**mmbulge._zplaw_scatter)
+
+        mstar = mmbulge.mstar_from_mbh(mbh, redz=redz, scatter=False)
+        # This is `dn_star / dlog10(M_star)`
+        ndens = self(mstar, redz)    # units of  [1/Mpc^3]
+        
+        mstar_log10 = np.log10(mstar/MSOL)
+        mbh_log10 = np.log10(mbh/MSOL)
+
+        bhmf_conv = np.zeros_like(mbh_log10)
+
+        for i, logMbh in enumerate(mbh_log10):
+            logMbh_mean = mmbulge._mamp_log10 + mmbulge._mplaw * (mstar_log10 - 11.0)
+            pdf = stnorm.pdf(logMbh, loc=logMbh_mean, scale=scatter)
+            bhmf_conv[i] = np.trapz(ndens * pdf, mstar_log10)
+        
+        return bhmf_conv
 
 
 class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
