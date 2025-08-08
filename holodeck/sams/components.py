@@ -146,6 +146,7 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
         mbh_log10 = np.log10(mbh/MSOL)
 
         bhmf_conv = np.zeros_like(mbh_log10)
+        logamp = np.log10((mmbulge._mamp * (1.0 + redz)**mmbulge._zplaw_amp)/MSOL)
 
         for i, logMbh in enumerate(mbh_log10):
             logMbh_mean = mmbulge._mamp_log10 + mmbulge._mplaw * (mstar_log10 - 11.0)
