@@ -65,6 +65,11 @@ class GW_Discrete(Grav_Waves):
         ss_rzi = np.zeros((nfreqs, nloudest, nreals))
         ss_rzf = np.zeros((nfreqs, nloudest, nreals))
 
+        bg_mt = np.zeros((nfreqs, nreals))
+        bg_mr = np.zeros((nfreqs, nreals))
+        bg_rzi = np.zeros((nfreqs, nreals))
+        bg_rzf = np.zeros((nfreqs, nreals))
+
         if eccen:
             harm_range = range(1, nharms+1)
         else:
@@ -78,7 +83,7 @@ class GW_Discrete(Grav_Waves):
             lo = fobs_gw[0] if (ii == 0) else fobs_gw[ii-1]
             hi = fobs_gw[1] if (ii == 0) else fobs_gw[ii]
             dlnf = np.log(hi) - np.log(lo)
-            _both, _fore, _back, _loud, _gwb_harms, _sspar = _gws_harmonics_at_evo_fobs(
+            _both, _fore, _back, _loud, _gwb_harms, _sspar, _bgpar = _gws_harmonics_at_evo_fobs(
                 fogw, dlnf, bin_evo, harm_range, nreals, box_vol, loudest=nloudest
             )
             loudest[ii, :] = _loud
@@ -90,6 +95,10 @@ class GW_Discrete(Grav_Waves):
             ss_mr[ii, :] = _sspar[1]
             ss_rzi[ii, :] = _sspar[2]
             ss_rzf[ii, :] = _sspar[3]
+            bg_mt[ii, :] = _bgpar[0]
+            bg_mr[ii, :] = _bgpar[1]
+            bg_rzi[ii, :] = _bgpar[2]
+            bg_rzf[ii, :] = _bgpar[3]
 
         self.both = np.sqrt(both)
         self.fore = np.sqrt(fore)
@@ -98,6 +107,7 @@ class GW_Discrete(Grav_Waves):
         self.loudest = loudest
         self.harms = harms
         self.sspar = [ss_mt, ss_mr, ss_rzi, ss_rzf]
+        self.bgpar = [bg_mt, bg_mr, bg_rzi, bg_rzf]
         return
 
 
@@ -290,13 +300,12 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     
     shape = (num_binaries.size, nreals)
     num_pois = poisson_as_needed(num_binaries[:, np.newaxis] * np.ones(shape))
-
+    #print(f"DEBUG:{num_pois.shape=}, {num_pois.min()=}, {num_pois.max()=}")
     
     # --- Calculate GW Signals
     temp = hs2 * gne * (2.0 / harms_1d)**2
     both = np.sum(temp[:, np.newaxis] * num_pois / dlnf, axis=0)
-    #print(f"DEBUG: {both.shape=}")
-
+    #print(f"DEBUG: {both.shape=}, {mtot.shape=}")
     # Calculate and return the expectation value hc^2 for each harmonic
     # (N, H)
     gwb_harms = np.zeros_like(harms_2d, dtype=float)
@@ -311,35 +320,45 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         #loud = np.sort(temp[:, np.newaxis] * (num_pois > 0), axis=0)[::-1, :]
         #temp_to_sort = temp[:, np.newaxis] * (num_pois > 0)
         temp_to_sort = temp[:, np.newaxis] * (num_pois > 0) / dlnf # bugfix: the factor of dlnf was missing here
-        idx_loud = np.argsort(temp_to_sort, axis=0)[::-1, :]
-        loud = np.take_along_axis(temp_to_sort, idx_loud, axis=0)
-        #print(f"DEBUG: before `loudest` cut: {idx_loud.shape=}, {loud.shape=}")
-        fore = loud[0, :]
-        loud = loud[:loudest, :]
-        #print(f"DEBUG: after `loudest` cut: {idx_loud.shape=}, {loud.shape=}, {fore.shape=}")
+        idx_sorted = np.argsort(temp_to_sort, axis=0)[::-1, :]
+        hc2_all = np.take_along_axis(temp_to_sort, idx_sorted, axis=0)
+        #print(f"DEBUG: before `loudest` cut: {temp.shape=}, {temp_to_sort.shape=}, {idx_sorted.shape=}, {hc2_all.shape=}")
+        fore = hc2_all[0, :]
+        loud = hc2_all[:loudest, :]
+        #print(f"DEBUG: after `loudest` cut: {idx_sorted.shape=}, {loud.shape=}, {fore.shape=}")
         
-        mtot_loud = np.take_along_axis(mtot[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
-        mtot_loud = mtot_loud[:loudest,:]
-        #print(f"DEBUG: after `loudest` cut: {mtot_loud.shape=}")
-        mrat_loud = np.take_along_axis(mrat[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
-        mrat_loud = mrat_loud[:loudest,:]
-        redz_init_loud = np.take_along_axis(redz_init[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
-        redz_init_loud = redz_init_loud[:loudest,:]
-        redz_final_loud = np.take_along_axis(redz_final[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
-        redz_final_loud = redz_final_loud[:loudest,:]
+        mtot_all = np.take_along_axis(mtot[:, np.newaxis] * (num_pois > 0), idx_sorted, axis=0)
+        #print(f"DEBUG: before `loudest` cut: {mtot.shape=}, {num_pois.shape=}, {idx_sorted.shape=}, {mtot_all.shape=}")
+        mtot_loud = mtot_all[:loudest,:]
+        mtot_bg = ( np.sum(mtot_all[loudest:,:] * hc2_all[loudest:, :],axis=0) / 
+                    hc2_all[loudest:, :].sum(axis=0) ) 
+        #print(f"DEBUG: after `loudest` cut: {mtot_loud.shape=}, {mtot_bg.shape=}")
+        mrat_all = np.take_along_axis(mrat[:, np.newaxis] * (num_pois > 0), idx_sorted, axis=0)
+        mrat_loud = mrat_all[:loudest,:]
+        mrat_bg = ( np.sum(mrat_all[loudest:,:] * hc2_all[loudest:, :],axis=0) / 
+                    hc2_all[loudest:, :].sum(axis=0) ) 
+        redz_init_all = np.take_along_axis(redz_init[:, np.newaxis] * (num_pois > 0), idx_sorted, axis=0)
+        redz_init_loud = redz_init_all[:loudest,:]
+        redz_init_bg = ( np.sum(redz_init_all[loudest:,:] * hc2_all[loudest:, :],axis=0) / 
+                         hc2_all[loudest:, :].sum(axis=0) )
+        redz_final_all = np.take_along_axis(redz_final[:, np.newaxis] * (num_pois > 0), idx_sorted, axis=0)
+        redz_final_loud = redz_final_all[:loudest,:]
+        redz_final_bg = ( np.sum(redz_final_all[loudest:,:] * hc2_all[loudest:, :],axis=0) / 
+                          hc2_all[loudest:, :].sum(axis=0) ) 
 
         sspar = [mtot_loud, mrat_loud, redz_init_loud, redz_final_loud]
-        #bgpar_freq = 
+        bgpar = [mtot_bg, mrat_bg, redz_init_bg, redz_final_bg]
     else:
         fore = np.zeros_like(both)
         loud = np.zeros((loudest, nreals))
         sspar = [np.zeros((loudest,nreals))]*4
+        bgpar = [np.zeros(nreals)]*4
         print(f"no loud sources in any realizations for {fobs_gw=}")
         
     back = both - fore
     #print(f"DEBUG: {back.mean()=}, {both.mean()=}, {fore.mean()=}")
     
-    return both, fore, back, loud, gwb_harms, sspar
+    return both, fore, back, loud, gwb_harms, sspar, bgpar
 
 
 def _gws_from_samples(vals, weights, fobs_gw_edges):
