@@ -3,6 +3,7 @@
 import os
 import h5py
 import numpy as np
+import pickle
 import holodeck as holo
 from holodeck import utils, log, _PATH_DATA, cosmo, discrete
 from holodeck.constants import PC, MSOL, YR, MPC, GYR, SPLC
@@ -295,9 +296,11 @@ class Discrete:
 
 
 
-def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True, inclOldIll=False, 
-                 inclT50=True, inclT300=True, inclRescale=False, allow_mbh0=False, skip_evo=False,
-                 fsa_only=False, subhalo_mstar_defn='SubhaloMassInRadType', nloudest=10, bfrac=None, fpath=_PATH_DATA):
+def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, freqs=None, freqs_edges=None, 
+                 inclIll=True, inclOldIll=False, inclT50=True, inclT300=True, inclRescale=False, 
+                 allow_mbh0=False, skip_evo=False, fsa_only=False, 
+                 subhalo_mstar_defn='MaxPastMass', nloudest=10, bfrac=None, 
+                 fpath=_PATH_DATA, pickle_dpops=True, pickle_name=''):
     
     assert ((fsa is not None) or (not fsa_only)), f"{fsa_only=} and {fsa=}; no dpops to generate."
     
@@ -305,9 +308,17 @@ def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True,
     print(f"Setting inspiral timescale tau = {tau} Gyr.")
     tau = tau * GYR
     
-    # ---- Define the GWB frequencies
-    freqs, freqs_edges = utils.pta_freqs()
-
+    # ---- Define the GWB frequencies if not already defined
+    if freqs is None or freqs_edges is None:
+        if freqs is not None or freqs_edges is not None:
+            msg = ('`freqs` and `freqs_edges` must both be defined to use input frequencies.'
+                   ' Ignoring input values and loading frequencies from utils.pta_freqs() instead.')
+            log.warning(msg)
+            warnings.warn(msg)
+        freqs, freqs_edges = utils.pta_freqs()
+        
+    nfreqs = freqs.shape[0]
+    
     # ---- Initialize return variables
     all_dpops = []
     tng_dpops = []
@@ -323,9 +334,14 @@ def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True,
     #tpath = '/orange/lblecha/IllustrisTNG/Runs/'
     #ipath = '/orange/lblecha/Illustris/'
     dpop_attrs = {
+        'Illustris-1-N001-bh1' : ('galaxy-mergers_Illustris-1_gas-000_dm-000_star-001_bh-001.hdf5', fpath,
+                                  np.array([0,0,0,0,1,1]).astype('int64'), 'darkgreen', 1.0),
         'Illustris-1-N010-bh0' : ('galaxy-mergers_Illustris-1_gas-000_dm-000_star-010_bh-000.hdf5', fpath,
                                   np.array([0,0,0,0,10,0]).astype('int64'), 'darkgreen', 1.5),
-        #'Illustris-1-bh0' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'g', 1.5),
+        'Illustris-1-N010-bh1' : ('galaxy-mergers_Illustris-1_gas-000_dm-000_star-010_bh-001.hdf5', fpath,
+                                  np.array([0,0,0,0,10,1]).astype('int64'), 'darkgreen', 2.0),
+        'Illustris-1-bh0' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 
+                             np.array([100,100,0,0,100,0]).astype('int64'), 'g', 2.25),
         'Illustris-1' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 
                          np.array([100,100,0,0,100,1]).astype('int64'), 'g', 2.5),
         #'TNG50-1-N100' : ('galaxy-mergers_TNG50-1_gas-100_dm-100_star-100_bh-001.hdf5',  fpath, 'darkred', 4),
@@ -335,11 +351,11 @@ def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True,
         #             np.array([800,800,0,0,800,1]).astype('int64')'r', 3.5),
         #'TNG50-2' : ('galaxy-mergers_TNG50-2_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'orange', 2.5),
         #'TNG50-3' : ('galaxy-mergers_TNG50-3_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 'y', 1.5),
-        'TNG100-1-N010-bh0' : ('galaxy-mergers_TNG100-1_gas-000_dm-000_star-010_bh-000.hdf5', fpath, 
-                               np.array([0,0,0,0,10,0]).astype('int64'), 'darkblue', 2.5),
+        #'TNG100-1-N010-bh0' : ('galaxy-mergers_TNG100-1_gas-000_dm-000_star-010_bh-000.hdf5', fpath, 
+        #                       np.array([0,0,0,0,10,0]).astype('int64'), 'darkblue', 2.5),
         #'TNG100-1-bh0' : ('galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'b', 1.5),
-        'TNG100-1' : ('galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 
-                      np.array([100,100,0,0,100,1]).astype('int64'), 'b', 2.5),
+        #'TNG100-1' : ('galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 
+        #              np.array([100,100,0,0,100,1]).astype('int64'), 'b', 2.5),
         #'TNG100-2' : ('galaxy-mergers_TNG100-2_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 'c', 1.5),
         #'TNG300-1-bh0' : ('galaxy-mergers_TNG300-1_gas-012_dm-012_star-012_bh-000.hdf5', fpath, 'm', 1.0),
         #'TNG300-1' : ('galaxy-mergers_TNG300-1_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 
@@ -401,13 +417,21 @@ def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True,
                 all_fsa_dpops = all_fsa_dpops + [dp_fsa]
                 tng_fsa_dpops = tng_fsa_dpops + [rescale_dp_fsa]
 
-        print(f"{l} dpop_attrs: {dpop_attrs[l][0]} {dpop_attrs[l][1]} {dpop_attrs[l][2]} {dpop_attrs[l][3]} {dpop_attrs[l][4]}")
+        print(f"{l} dpop_attrs: {dpop_attrs[l][0]} {dpop_attrs[l][1]} "
+              f"{dpop_attrs[l][2]} {dpop_attrs[l][3]} {dpop_attrs[l][4]}")
 
     
-    if fsa is not None:
+    #if fsa is not None:
+    data = all_dpops, tng_dpops, all_fsa_dpops, tng_fsa_dpops
 
-        return all_dpops, tng_dpops, all_fsa_dpops, tng_fsa_dpops
+    if pickle_dpops:
+        ## Save the dpops as a pickle
+        if fsa is not None: pickle_name += '_with_fsa'
+        pkl_fname = f"dpops_nfreqs{nfreqs}_nreals{nreals}_nloud{nloudest}_tau{tau/GYR}_{pickle_name}.pkl"
+        with open(pkl_fname, "wb") as f:
+            pickle.dump(data, f)
 
-    else:
-        
-        return all_dpops, tng_dpops
+    return data 
+
+    #else:  
+    #    return all_dpops, tng_dpops
