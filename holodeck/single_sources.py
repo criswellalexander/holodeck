@@ -114,11 +114,6 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
                 redz = kale.utils.midpoints(redz, axis=0)
                 redz = np.moveaxis(redz, 0, dd)
 
-            # if np.any(np.logical_and(redz<0, redz!=-1)):
-            #     err = np.sum(np.logical_and(redz<0, redz!=-1))
-            #     err = f"{err} redz < 0 and !=-1 found in redz, in ss_gws_redz() after kale.utils.midpoints"
-            #     raise ValueError(err)
-
             dcom_final = +np.inf*np.ones_like(redz)
 
             sel = (redz > 0.0)
