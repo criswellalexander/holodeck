@@ -439,15 +439,6 @@ class PS_Astro_Strong_MMBulge(_PS_Astro_Strong):
         return
 
 
-_param_spaces_dict = {
-    'PS_Astro_Strong_All': PS_Astro_Strong_All,
-    'PS_Astro_Strong_Hard': PS_Astro_Strong_Hard,
-    'PS_Astro_Strong_Hard_All': PS_Astro_Strong_Hard_All,
-    'PS_Astro_Strong_GSMF': PS_Astro_Strong_GSMF,
-    'PS_Astro_Strong_GMR': PS_Astro_Strong_GMR,
-    'PS_Astro_Strong_MMBulge': PS_Astro_Strong_MMBulge,
-    'PS_Astro_Strong_MMBulge_BFrac': PS_Astro_Strong_MMBulge_BFrac,
-}
 
 class PS_Astro_Strong_01(_PS_Astro_Strong):
 
@@ -469,3 +460,14 @@ class PS_Astro_Strong_01(_PS_Astro_Strong):
             log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
         )
         return
+    
+ _param_spaces_dict = {
+    'PS_Astro_Strong_All': PS_Astro_Strong_All,
+    'PS_Astro_Strong_Hard': PS_Astro_Strong_Hard,
+    'PS_Astro_Strong_Hard_All': PS_Astro_Strong_Hard_All,
+    'PS_Astro_Strong_GSMF': PS_Astro_Strong_GSMF,
+    'PS_Astro_Strong_GMR': PS_Astro_Strong_GMR,
+    'PS_Astro_Strong_MMBulge': PS_Astro_Strong_MMBulge,
+    'PS_Astro_Strong_MMBulge_BFrac': PS_Astro_Strong_MMBulge_BFrac,
+    'PS_Astro_Strong_01': PS_Astro_Strong_01,
+}
