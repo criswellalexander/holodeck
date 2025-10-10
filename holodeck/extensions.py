@@ -64,9 +64,42 @@ class Realizer:
 
 
 class Realizer_SAM:
+
+
+    @classmethod
+    def load(cls, path_input):
+        """Load a Realizer_SAM object from a saved npz file.
+
+        Parameters
+        ----------
+        path_input : str
+            Path to the npz file to load.
+
+        Returns
+        -------
+        Realizer_SAM
+            Loaded Realizer_SAM instance.
+        """
+        data = np.load(path_input, allow_pickle=True)
+        
+        # Create instance without computing
+        fobs_orb_edges = data['fobs_orb_edges']
+        instance = cls(fobs_orb_edges=fobs_orb_edges, _from_file=True)
+        
+        # Restore saved attributes
+        instance._edges = [data['mtot_edges'], data['mrat_edges'],
+                           data['redz_edges'], fobs_orb_edges]
+        instance._number = data['number']
+        instance._redz_final = data['redz_final']
+        
+        print(f"Loaded Realizer_SAM from {path_input}")
+        return instance
+    
+
+
     def __init__(
             self, fobs_orb_edges, sam=None, hard=None, params=None,
-            pspace=None
+            pspace=None, _from_file=False
         ):
         """Construct a Realizer for a given semi-analytic model and hardening model,
         or build this model using params and a pspace.
@@ -87,6 +120,8 @@ class Realizer_SAM:
         possibly use the same resample/downsample function.
         """
         # pspace = pspace(log=holo.log)
+        if _from_file:
+            return
 
         # check that ('sam' and 'hard') OR 'params' is provided
         if params is not None:
@@ -99,9 +134,9 @@ class Realizer_SAM:
                 err = "'params' or ('sam' and 'hard') must be provided."
                 raise ValueError(err)
 
-        self._sam = sam
-        self._hard = hard
-        self._fobs_orb_edges = fobs_orb_edges
+        # self._sam = sam
+        # self._hard = hard
+        # self._fobs_orb_edges = fobs_orb_edges
         
 
         # ---- Calculate number of binaries in each bin
@@ -115,6 +150,31 @@ class Realizer_SAM:
         self._edges = edges
         self._number = number
         self._redz_final = redz_final
+
+    def save(self, path_name):
+        """ Save the Realizer_SAM object to a npz file.
+
+        Parameters
+        ----------
+        path_output : str
+            Path to save the npz file.
+
+        Returns
+        -------
+        None
+        """
+        np.savez(
+            path_name,
+            mtot_edges=self._edges[0],
+            mrat_edges=self._edges[1],
+            redz_edges=self._edges[2],
+            fobs_orb_edges=self._edges[3],
+            number=self._number,
+            redz_final=self._redz_final,
+            # fobs_orb_edges=self._fobs_orb_edges,
+        )
+        print(f"Saved Realizer_SAM to {path_name}")
+        return
 
     def __call__(self, nreals=1, debug=False):
         """ Calculate samples and weights for an entire semi-analytic population.
@@ -139,9 +199,9 @@ class Realizer_SAM:
 
         """
 
-        sam = self._sam
-        hard = self._hard
-        fobs_orb_edges = self._fobs_orb_edges
+        # sam = self._sam
+        # hard = self._hard
+        # fobs_orb_edges = self._fobs_orb_edges
 
         # number and redz_final only need to be calculated once, in init()
         edges = self._edges 
@@ -182,16 +242,12 @@ class Realizer_SAM:
 
         return names, samples, weights
     
-    def char_strain(self):
+    def char_strain(self,):
         """ Calculate characteristic strain for the realized population of BBHs. Note this doesn't use the saved weights,
         but generates new ones. TODO: use the real weights
 
         Params
         ------
-        params_flag : boolean
-            Whether or not to calculate binary properties
-        nloudest : integer
-            Number of loudest sources to extract
 
         Returns
         -------
@@ -220,8 +276,8 @@ class Realizer_SAM:
         h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(self._edges, self._redz_final)
 
         # calculate sum of char strains
-        number = self._all_weights.reshape(len(mt),len(mr),len(rz), len(fo))
-        gwb = np.sqrt(np.sum(h2fdf*number, axis=(0,1,2)))
+        number = self._all_weights.reshape(len(mt),len(mr),len(rz), len(fo), self._nreals)
+        gwb = np.sqrt(np.sum(h2fdf[...,np.newaxis]*number, axis=(0,1,2)))
         return fo, gwb
 
             
