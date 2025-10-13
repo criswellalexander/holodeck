@@ -270,7 +270,7 @@ class Realizer_SAM:
         mt = kale.utils.midpoints(self._edges[0]) #: total mass
         mr = kale.utils.midpoints(self._edges[1]) #: mass ratio
         rz = kale.utils.midpoints(self._edges[2]) #: initial redshift
-        fo = kale.utils.midpoints(self._fobs_orb_edges) * 2.0
+        fo = kale.utils.midpoints(self._edges[3]) * 2.0 #: fobs gw = fobs_orb * 2, edges
 
         # hsfdf = hsamp^2 * f/df # this is same as hc^2
         h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(self._edges, self._redz_final)
