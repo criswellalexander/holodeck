@@ -467,6 +467,7 @@ class PS_Astro_Strong_ECG_02(_PS_Astro_Strong):
         parameters = [
             # Hardening model (phenom 2PL)
             PD_Uniform("hard_time", 0.1, 11.0, default=3.0),   # [Gyr]
+            PD_Uniform("hard_gamma_inner", -2.0, +0.0, default=-1.0),
             
             # GSMF
             PD_Normal('gsmf_log10_phi_one_z0', -2.383, 0.028),    # - 2.383 ± 0.028
