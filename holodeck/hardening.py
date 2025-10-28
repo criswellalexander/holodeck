@@ -1012,9 +1012,6 @@ class Fixed_Time_2PL(_Hardening):
 
         xx = sepa / rchar
         dadt = cls.function(norm, xx, gamma_inner, gamma_outer)
-        #if not np.all(np.isfinite(dadt)) or not np.all(np.isfinite(dadt_gw)):
-        #    print(f'\n\n**DEBUG** in _dadt_dedt(): {m1[0]=} {m2[0]=} {sepa[0]=} {dadt_gw[0]=} {xx[0]=} {dadt[0]=} {norm[0]=} {gamma_inner=} {gamma_outer=}')
-        #    raise ValueError("non-finite dadt or dadt_gw in _dadt_dedt()")
         dadt += dadt_gw
 
         dedt = None
