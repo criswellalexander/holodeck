@@ -866,7 +866,6 @@ class Fixed_Time_2PL(_Hardening):
         else:
             log.info("calculating normalization exactly")
             norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_inner, gamma_outer, sepa_init, progress=progress)
-
         self._gamma_inner = gamma_inner
         self._gamma_outer = gamma_outer
         self._time = time
@@ -1013,6 +1012,9 @@ class Fixed_Time_2PL(_Hardening):
 
         xx = sepa / rchar
         dadt = cls.function(norm, xx, gamma_inner, gamma_outer)
+        #if not np.all(np.isfinite(dadt)) or not np.all(np.isfinite(dadt_gw)):
+        #    print(f'\n\n**DEBUG** in _dadt_dedt(): {m1[0]=} {m2[0]=} {sepa[0]=} {dadt_gw[0]=} {xx[0]=} {dadt[0]=} {norm[0]=} {gamma_inner=} {gamma_outer=}')
+        #    raise ValueError("non-finite dadt or dadt_gw in _dadt_dedt()")
         dadt += dadt_gw
 
         dedt = None
@@ -1241,7 +1243,6 @@ class Fixed_Time_2PL(_Hardening):
             cut = slice(lo, hi)
             # calculate normalizations for this chunk
             norm[cut] = cls._get_norm(target_time[cut], *[aa[cut] for aa in args], **kwargs)
-
         return norm
 
     @classmethod
@@ -1439,6 +1440,11 @@ class Fixed_Time_2PL_SAM(_Hardening):
 
         if norm is None:
             norm = self._norm
+            # change shape of `norm` from (M,Q) to (M,Q,Z,R)
+            mtot, norm = np.broadcast_arrays(
+                mtot, 
+                norm[:, :, np.newaxis, np.newaxis]
+            )
 
         args = np.broadcast_arrays(mtot, mrat, sepa, norm)
         shape = args[0].shape
@@ -1449,6 +1455,7 @@ class Fixed_Time_2PL_SAM(_Hardening):
             self._rchar, self._gamma_inner, self._gamma_outer   # must all be scalars
         )
         dadt_vals = dadt_vals.reshape(shape)
+
         return dadt_vals
 
 
