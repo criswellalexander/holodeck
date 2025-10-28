@@ -1600,7 +1600,8 @@ def loudest_hc_and_par_from_sorted_redz(
     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
     cdef np.ndarray[np.double_t, ndim=4] sspar = np.zeros((4,F,R,L))
-    cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((7,F,R))
+    #cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((7,F,R))
+    cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((8,F,R))
     _loudest_hc_and_par_from_sorted_redz(shape, h2fdf, number, nreals, nloudest, normal_threshold,
                             mt, mr, rz, redz_final, dcom_final, sepa, angs,
                             msort, qsort, zsort,
@@ -1660,9 +1661,12 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
     sspar : (4, F, R) NDarray of scalars
         Effective M, q, z parameters of the loudest L sources.
         mass, ratio, redshift, redshift_final
-    bgpar : (4, F, R) NDarray of scalars
+    bgpar : (8, F, R) NDarray of scalars
         Average effective M, q, z parameters of the background.
-        mass, ratio, redshift, redshift_final
+        mass, ratio, redshift, redshift_final, dcom after hardening, 
+        binary separation after hardening, binary angular separation after hardening,
+        number of binaries 
+
 
     Returns
     -------
@@ -1704,6 +1708,7 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
                      # start at 0 for the loudest of all.
             # reset strain sums
             sum_bg = 0 # sum of bg h2fdf, for parameter averaging and gwb
+            num_bg = 0 # sum of number of binaries (per freq bin)
             # reset parameter averaging sums
             m_bg = 0
             q_bg = 0
@@ -1747,6 +1752,7 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
                     ll += 1
 
                 sum_bg += num * cur # tot bg h2fdf
+                num_bg += num # tot number of binaries contributing to bg
                 # add to average parameters of background sources
                 m_bg += num * cur * mt[mm] # tot weight bg mass
                 q_bg += num * cur * mr[qq] # tot weighted bg ratio
@@ -1765,6 +1771,7 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
             bgpar[4,ff,rr] = dcom_bg/sum_bg # bg avg comoving distance after hardening
             bgpar[5,ff,rr] = sepa_bg/sum_bg # bg avg binary separation after hardening
             bgpar[6,ff,rr] = angs_bg/sum_bg # bg avg binary angular separation after hardening
+            bgpar[7,ff,rr] = num_bg # bg number of binaries 
 
 
 
