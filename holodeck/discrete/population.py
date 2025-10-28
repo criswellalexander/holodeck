@@ -397,7 +397,8 @@ class Pop_Illustris(_Population_Discrete):
             #                        in zip(data['time'][:,0],data['time'][:,1]) ]) 
             # RG15 defines the *descendant* snap as the merger time
             self.scafa = data['time'][:,2]
-        
+
+        # ---- Binary Properties
         # ---- Load mstar first so we can easily mask any data with mstar=0
         if self._subhalo_mstar_defn == 'SubhaloMassType':
             self.mstar = data['SubhaloMassType'][:, st_idx, :2]   # [grams]
@@ -414,47 +415,29 @@ class Pop_Illustris(_Population_Discrete):
             raise ValueError(f"Invalid keyword value: {self._subhalo_mstar_defn=}. "
                              f"Must be 'SubhaloMassType', 'SubhaloMassInRadType', or 'MaxPastMass'")
 
-        # ---- Mask any data with mstar=0
+        # ---- Define mask for any data with mstar=0
         mstar_mask = ((self.mstar[:,0]>0)&(self.mstar[:,1]>0)&(self.mstar_desc>0))
-        if self.mstar.min() == 0 or self.mstar_desc.min() == 0:
-            msg = (f'{self.mstar_desc[~mstar_mask].size} of {self.mstar_desc.size} binaries '
-                   'have mstar=0 or mstar_desc=0. Removing from merger sample.')
-            self.mstar = self.mstar[mstar_mask,:]
-            self.mstar_desc = self.mstar_desc[mstar_mask]
-            self.scafa = self.scafa[mstar_mask]
-            msg += f' Proceeding with the remaining {self.mstar_desc.size} binaries.'
-            log.warning(msg)
-            warnings.warn(msg)
-        else:
-            if self.mstar_desc[mstar_mask].size != self.mstar_desc.size:
-                msg = ("should not have any masked elements, but masked and original arrays have unequal length: "
-                       f"{self.mstar_desc[mstar_mask].size} != {self.mstar_desc.size}")
-                raise ValueError("should not have any masked elements, but masked and original arrays have unequal length.")
-    
-        print(f"DEBUG: in population: {self.scafa.min()=}, {self.scafa.max()=}, {np.median(self.scafa)=}")
-        print(f"num with scafa=1: {self.scafa[self.scafa==1].size}")
-        # ---- Binary Properties
-        # Set initial separation to sum of stellar half-mass radii
-        gal_rads = data['SubhaloHalfmassRadType'][mstar_mask, :, :]
-        gal_rads = gal_rads[:, st_idx, :2] # progenitor galaxy radii
-        print(f"{gal_rads.min()=}, {gal_rads.max()=}")
-        if (fixed_sepa is not None):
-            self.sepa = np.ones_like(gal_rads[:, 0]) * fixed_sepa      #: Initial binary separation [cm]
-        else:
-            self.sepa = np.sum(gal_rads, axis=-1)       #: Initial binary separation [cm]
-        print(f"{self.sepa.min()=}, {self.sepa.max()=}")
-        self.mass = data['SubhaloBHMass'][mstar_mask, :2]       #: progenitor BH Masses in subhalo [grams]
+        msg = (f'{self.mstar_desc[~mstar_mask].size} of {self.mstar_desc.size} binaries '
+               'have mstar=0 or mstar_desc=0 & will be removed from merger sample.')
+        log.warning(msg)
+        warnings.warn(msg)
+
+        # --- Load mbh next and check if we need to mask mbh=0
+        self.mass = data['SubhaloBHMass'][:, :2]       #: progenitor BH Masses in subhalo [grams]
 
         # check for zero BH mass and treat based on `self._allow_mbh0` flag
         if self.mass.min() == 0:
+            bh_mask = ((self.mass[:,0]>0)|(self.mass[:,1]>0))
             if self._allow_mbh0:
                 # identify galaxies with no BH (mbh=0)
-                mask0 = (self.mass[:,0]==0)
-                mask1 = (self.mass[:,1]==0)
-                all0count = np.where((mask0)&(mask1))[0].size 
-                print(f"Found {self.mass[mask0,0].size} first progs with mbh=0 "
-                      f"and {self.mass[mask1,1].size} next progs with with mbh=0. "
-                      f"{all0count} binaries have mbh=0 for both.")
+                m1IsZero = (self.mass[:,0]==0)
+                m2IsZero = (self.mass[:,1]==0)
+                both0count = np.where((m1IsZero)&(m2IsZero))[0].size 
+                print(f"Found {self.mass[m1IsZero,0].size} BH1 with mbh=0 "
+                      f"and {self.mass[m2IsZero,1].size} BH2 with with mbh=0.\n"
+                      f"{np.where(~bh_mask)[0].size} binaries have at least one member with mbh=0, "
+                      f"{both0count} binaries have mbh=0 for both.\n"
+                      f"{np.where((~bh_mask)&(~mstar_mask))[0].size} binaries with mbh=0 also have mstar=0.")
 
                 #msg = (f"Changing BH mass from 0 to 1e2msun for {self.mass[mask0,0].size} first progs "
                 #       f"and {self.mass[mask1,1].size} next progs.\n Both BH masses reset for {all0count} mergers.")
@@ -462,12 +445,65 @@ class Pop_Illustris(_Population_Discrete):
                 #warnings.warn(msg)
                 #self.mass[mask0,0] = 1.0e2 * MSOL ## setting zero-mass BHs to initial mass of 1e2
                 #self.mass[mask1,1] = 1.0e2 * MSOL ## setting zero-mass BHs to initial mass of 1e2
+                
+                sim_data_mask = mstar_mask
             else:
-                err = f"One or more galaxies have zero BH mass with {self._allow_mbh0=}!"
-                log.exception(err)
-                raise ValueError(err)
+                msg = (f"{np.where(bh_mask)[0].size} mergers have a zero-mass BH with {self._allow_mbh0=}. "
+                       f"Excluding these systems from merger sample.\n"
+                       f"{mstar[(~bh_mask)&(~mstar_mask)].size} binaries with mbh=0 also have mstar=0.") 
+                log.warning(msg)
+                warnings.warn(msg)
+                #err = f"One or more galaxies have zero BH mass with {self._allow_mbh0=}!"
+                #log.exception(err)
+                #raise ValueError(err)
+                
+                sim_data_mask = ((mstar_mask)&(bh_mask))
+                
         else:
             print("No zero-mass BHs found in this merger tree file!")
+            sim_data_mask = mstar_mask
+                                 
+
+        # ---- Mask data with mstar=0 (and mbh=0 if requested)
+        print(f"DEBUG: before masking: {self.mstar.shape=}, {self.mstar_desc.shape=}, "
+              f"{self.scafa.shape=}, {self.mass.shape=}")
+        self.mstar = self.mstar[sim_data_mask,:]
+        self.mstar_desc = self.mstar_desc[sim_data_mask]
+        self.scafa = self.scafa[sim_data_mask]
+        self.mass = self.mass[sim_data_mask,:]
+        print(f"DEBUG: after masking: {self.mstar.shape=}, {self.mstar_desc.shape=}, "
+              f"{self.scafa.shape=}, {self.mass.shape=}")
+        
+        #if self.mstar.min() == 0 or self.mstar_desc.min() == 0:
+        #    msg = (f'{self.mstar_desc[~mstar_mask].size} of {self.mstar_desc.size} binaries '
+        #           'have mstar=0 or mstar_desc=0. Removing from merger sample.')
+        #    self.mstar = self.mstar[mstar_mask,:]
+        #    self.mstar_desc = self.mstar_desc[mstar_mask]
+        #    self.scafa = self.scafa[mstar_mask]
+        #    msg += f' Proceeding with the remaining {self.mstar_desc.size} binaries.'
+        #    log.warning(msg)        self.mass = self.mstar[sim_data_mask,:]
+        #    warnings.warn(msg)
+        #else:
+        #    if self.mstar_desc[mstar_mask].size != self.mstar_desc.size:
+        #        msg = ("should not have any masked elements, but masked and original arrays have unequal length: "
+        #               f"{self.mstar_desc[mstar_mask].size} != {self.mstar_desc.size}")
+        #        raise ValueError("should not have any masked elements, but masked and original arrays have unequal length.")
+    
+        print(f"DEBUG: in population: {self.scafa.min()=}, {self.scafa.max()=}, {np.median(self.scafa)=}")
+        print(f"num with scafa=1: {self.scafa[self.scafa==1].size}")
+
+        
+        # Set initial separation to sum of stellar half-mass radii
+        gal_rads = data['SubhaloHalfmassRadType'][sim_data_mask, :, :]
+        gal_rads = gal_rads[:, st_idx, :2] # progenitor galaxy radii
+        print(f"{gal_rads.min()=}, {gal_rads.max()=}")
+        if (fixed_sepa is not None):
+            self.sepa = np.ones_like(gal_rads[:, 0]) * fixed_sepa      #: Initial binary separation [cm]
+        else:
+            self.sepa = np.sum(gal_rads, axis=-1)       #: Initial binary separation [cm]
+        print(f"{self.sepa.min()=}, {self.sepa.max()=}")
+
+        
         
         # ---- Galaxy Properties
         ## Get the stellar mass, and take that as bulge mass
@@ -549,21 +585,21 @@ class Pop_Illustris(_Population_Discrete):
         #else:
         #    print("No zero-mass progenitor bulges found in this merger tree file!")
 
-        self.vdisp = data['SubhaloVelDisp'][mstar_mask]    #: Velocity dispersion of galaxy [cm/s]
+        self.vdisp = data['SubhaloVelDisp'][sim_data_mask]    #: Velocity dispersion of galaxy [cm/s]
 
         if oldFile:
             msg = 'Defining `self.prog_mass_ratio` manually for old Illustris file.'
             log.warning(msg)
             warnings.warn(msg)
-            self.prog_mass_ratio = data['fpMass'][mstar_mask] / data['npMass'][mstar_mask] 
+            self.prog_mass_ratio = data['fpMass'][sim_data_mask] / data['npMass'][sim_data_mask] 
 
-            self.first_prog_mass = data['fpMass'][mstar_mask] # first progenitor mass at tmax (time of max past mass) #code units!!
-            self.next_prog_mass = data['npMass'][mstar_mask] # next progenitor mass at tmax (time of max past mass) #code units!!
+            self.first_prog_mass = data['fpMass'][sim_data_mask] # first progenitor mass at tmax (time of max past mass) #code units!!
+            self.next_prog_mass = data['npMass'][sim_data_mask] # next progenitor mass at tmax (time of max past mass) #code units!!
         else:
-            self.prog_mass_ratio = data['ProgMassRatio'][mstar_mask] # progenitor mass ratio at tmax (time of max past mass)
+            self.prog_mass_ratio = data['ProgMassRatio'][sim_data_mask] # progenitor mass ratio at tmax (time of max past mass)
 
-            self.first_prog_mass = data['fpMass'][mstar_mask] # first progenitor mass at tmax (time of max past mass) #code units!!
-            self.next_prog_mass = data['npMass'][mstar_mask] # next progenitor mass at tmax (time of max past mass) #code units!!
+            self.first_prog_mass = data['fpMass'][sim_data_mask] # first progenitor mass at tmax (time of max past mass) #code units!!
+            self.next_prog_mass = data['npMass'][sim_data_mask] # next progenitor mass at tmax (time of max past mass) #code units!!
 
         if self.prog_mass_ratio.max() > 1.0:
             msg = "Redefining mass ratio to be always <= 1."
@@ -885,6 +921,113 @@ class PM_Mass_Reset(_Population_Modifier):
 
         return
 
+
+class PM_Cuts(_Population_Modifier):
+    """Population Modifier to impose cuts on binary population after it is defined.
+    """
+
+    # Additional variables to be resampled
+    # NOTE: mtot, mrat, redz, sepa, eccen (if not None) are all resampled automatically
+    #_DEF_ADDITIONAL_KEYS = ['vdisp', 'mbulge']
+    _DEF_ADDITIONAL_KEYS = ['vdisp', 'mbulge', 'mbulge_desc', 'mstar', 'mstar_desc', 
+                            'prog_mass_ratio', 'first_prog_mass', 'next_prog_mass']
+    
+    def __init__(self, mrat_min=None, mtot_min=None, additional_keys=True):
+        """Initialize `PM_Cuts` instance.
+
+        Parameters
+        ----------
+        mrat_min : float,
+            If not None, remove all binaries with mass ratios lower than this value
+        mtot_min : float,
+            If not None, remove all binaries with total mass lower than this value
+        additional_keys : bool, or list of strings
+            Whether or not to resample additional attributes of the population.
+            `True`: cuts also applied to the parameters in `_DEF_ADDITIONAL_KEYS`.
+            `False` or `None`: no additional parameters have cuts applied.
+            `list[str]`: cuts are applied to the provided additional parameters, which must be attributes
+                of the population instance being cut.
+
+        """
+        self.mrat_min = mrat_min
+        self.mtot_min = mtot_min
+        
+        # Set which additional attributes will be resampled
+        if additional_keys is True:
+            additional_keys = self._DEF_ADDITIONAL_KEYS
+        elif additional_keys in [False, None]:
+            additional_keys = []
+        self._additional_keys = additional_keys   #: Additional parameter names to be resampled
+        return
+
+    def modify(self, pop):
+        """Apply specified cuts to binary population mtot and mass ratio.
+
+        Parameters
+        ----------
+        pop : instance of `_Population_Discrete` or subclass,
+            Binary population to be modified.
+
+        """
+        labels = ['mtot', 'mrat', 'redz', 'sepa']
+        eccen = pop.eccen
+        if eccen is not None:
+            labels.append('eccen')
+            
+        # Add optional variables specified in `_additional_keys` (by default, from `_DEF_ADDITIONAL_KEYS`)
+        opt_idx = []
+        for ii, opt in enumerate(self._additional_keys):
+            # Load value
+            vals = getattr(pop, opt, None)
+            #print(f"{ii=}, {opt=}, {vals=}")
+            if vals is not None:
+                idx = len(labels) + ii
+                opt_idx.append(idx)
+                labels.append(opt)
+            else:
+                opt_idx.append(None)
+        print(f"{opt_idx=}")
+        print(f"{labels=}")
+        
+        
+        # Apply cuts to minimum binary total mass and mass ratio
+        mt, mr = utils.mtmr_from_m1m2(pop.mass)
+        if self.mrat_min is None and self.mtot_min is None:
+            raise ValueError('Cannot apply cuts in PM_Cuts when mrat_min and mtot_min are both None.')
+        if self.mrat_min is None: self.mrat_min = 0.0
+        if self.mtot_min is None: self.mtot_min = 0.0
+        
+        mask = ((mt >= self.mtot_min) & (mr >= self.mrat_min))
+        print(f"Defined mask to remove binaries with mtot<{self.mtot_min} & mrat<{self.mrat_min}")
+        print(f"Old data had {mt.size} binaries, new data will have {mt[mask].size} binaries.")
+        #print(f"NOT implementing these cuts yet while debugging")
+        
+        print(f"before: {pop.mass.shape=}, m1min={pop.mass[:,0].min()/MSOL}, m2min={pop.mass[:,1].min()/MSOL}")
+        pop.mass = utils.m1m2_from_mtmr(mt[mask], mr[mask]).T
+        print(f"after: {pop.mass.shape=}, m1min={pop.mass[:,0].min()/MSOL}, m2min={pop.mass[:,1].min()/MSOL}")
+        print(f"before cuts: {pop.scafa.shape=}, {pop.redz.shape=}")
+        pop.scafa = pop.scafa[mask]
+        print(f"after cuts: {pop.scafa.shape=}, {pop.redz.shape=}")
+        print(f"before cuts: {pop.sepa.shape=}")
+        pop.sepa = pop.sepa[mask]
+        print(f"after cuts: {pop.sepa.shape=}")
+        if pop.eccen is not None:
+            pop.eccen = pop.eccen[mask]
+            
+        # Apply cuts to optional variables specified in `_additional_keys` (by default, from `_DEF_ADDITIONAL_KEYS`)
+        for ii, opt in enumerate(self._additional_keys):
+            # Load value
+            vals = getattr(pop, opt, None)
+            print(f"{ii=}, {opt=}, {vals.shape=}")
+            if vals is not None:
+                labels.append(opt)
+                print(f"{vals[mask].shape=}")
+                vals = vals[mask]
+                setattr(pop, opt, vals)
+        print(f"{labels=}")
+        
+        return
+        
 
 class PM_Density(_Population_Modifier):
 
