@@ -883,8 +883,7 @@ def gaussian_freqs(num, fmax, dur=16.03*YR):
         Typically `dur` should be given in units of [sec], such that the returned frequencies are
         in units of [1/sec] = [Hz]
     num : int,
-        Number of frequency bins.  If `cad` is not None, then the number of frequency bins is
-        determined by `cad` and the `num` value is disregarded.
+        Number of frequency bins between 1/dur and fmax.
     fmax : float
         Maximum frequency to consider. Must be less than the Nyquist frequency.
 
@@ -897,8 +896,7 @@ def gaussian_freqs(num, fmax, dur=16.03*YR):
     edges : (F+1,) ndarray
         Bin-edge frequencies for `F` bins, i.e. `F+1` bin edges.  The frequency bin edges are at:
         ``F_i = (1/dur) + (i+1) * (fmax - 1/dur)/(num-1) `` for i between 0 and `num`.
-        The number of frequency bins, `F` is the argument `num`,
-        or determined by `cad` if it is given.
+        The number of frequency bins, `F` is the argument `num`.
 
     """
     ## get the minimum sensitive frequency
