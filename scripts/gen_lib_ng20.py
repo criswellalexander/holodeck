@@ -55,7 +55,7 @@ from holodeck.librarian import gen_lib
 
 comm = MPI.COMM_WORLD
 
-#: aliases for the parameter spaces tested in `notebooks/devs/ng20_all_param_spaces.ipynb`
+#: aliases for the NG20 parameter spaces
 PSPACE_ALIASES = {
     'fiducial': 'PS_NG20_Fiducial',
     'hard': 'PS_NG20_Fiducial_Hard',
@@ -65,7 +65,7 @@ PSPACE_ALIASES = {
 
 def main():
 
-    # ---- setup arguments, loggers, and outputs
+    #  setup arguments, loggers, and outputs
 
     if comm.rank == 0:
         # catch exits (e.g. `-h` or bad arguments) so that they can be shared with all processes
@@ -84,7 +84,7 @@ def main():
 
     if comm.rank == 0:
         # get parameter-space (created new, or loaded from previous save when `args.resume`)
-        space = gen_lib._setup_param_space(args)
+        pspace = gen_lib._setup_param_space(args)
 
         if args.resume:
             max_failures = args.max_failures
@@ -94,8 +94,8 @@ def main():
             args.resume = True
             args.max_failures = max_failures
         else:
-            space_fname = space.save(args.output)
-            log.info(f"Saved parameter space {space} to {space_fname}")
+            space_fname = pspace.save(args.output)
+            log.info(f"Saved parameter space {pspace} to {space_fname}")
             config_fname = gen_lib._save_config(args)
             log.info(f"Saved configuration to {config_fname}")
             dst_file = args.output.joinpath("runtime_" + Path(__file__).name)
@@ -109,16 +109,16 @@ def main():
         indices = np.array_split(indices, comm.size)
         num_ind_per_proc = [len(ii) for ii in indices]
         log.warning(
-            f"param_space={args.param_space}, parameters={space.nparameters}, samples={npars}, "
+            f"param_space={args.param_space}, parameters={pspace.nparameters}, samples={npars}, "
             f"sam_shape={args.sam_shape}, nreals={args.nreals}, nfreqs={args.nfreqs}, "
             f"pta_dur={args.pta_dur} [yr] || cores={comm.size}, "
             f"max runs per core = {np.max(num_ind_per_proc)}"
         )
     else:
-        space = None
+        pspace = None
         indices = None
 
-    space = comm.bcast(space, root=0)
+    pspace = comm.bcast(pspace, root=0)
     args = comm.bcast(args, root=0)
     indices = comm.scatter(indices, root=0)
 
@@ -131,9 +131,9 @@ def main():
 
     for par_num in iterator:
         log.debug(f"{comm.rank=} {par_num=}")
-        params = space.param_dict(par_num)
+        params = pspace.param_dict(par_num)
 
-        rv, _sim_fname = gen_lib.run_sam_at_pspace_params(args, space, par_num, params)
+        rv, _sim_fname = gen_lib.run_sam_at_pspace_params(args, pspace, par_num, params)
         if rv is False:
             failures += 1
 
@@ -158,7 +158,7 @@ def main():
 
 
 def _int_from_float(val):
-    """Convert strings like '1e5' to integers."""
+    """Convert 1eX to integer."""
     fval = float(val)
     ival = int(fval)
     if ival != fval:
@@ -180,9 +180,9 @@ def _setup_argparse():
     parser.add_argument('-p', '--pspace', type=str, default='fiducial',
                         help=f"parameter space: one of {aliases}, or a parameter-space class name")
 
-    parser.add_argument('-n', '--nsamples', type=_int_from_float, default=100_000,
+    parser.add_argument('-n', '--nsamples', type=_int_from_float, default='1e5',
                         help='number of parameter space samples')
-    parser.add_argument('-r', '--nreals', type=_int_from_float, default=1_000,
+    parser.add_argument('-r', '--nreals', type=_int_from_float, default='1e3',
                         help='number of realizations at each parameter-space sample')
     parser.add_argument('-s', '--sam_shape', type=int, nargs='+', default=None,
                         help="SAM grid shape: one int for all dimensions, or three ints for (M, q, z). "
@@ -213,7 +213,7 @@ def _setup_argparse():
 
     args = parser.parse_args()
 
-    # ---- resolve and check parameter-space name
+    # resolve and check parameter-space name
 
     param_space = PSPACE_ALIASES.get(args.pspace.lower(), args.pspace)
     if ("." not in param_space) and (param_space not in lib.param_spaces_dict):
@@ -222,7 +222,7 @@ def _setup_argparse():
             f"or one of: {', '.join(lib.param_spaces_dict.keys())}"
         )
 
-    # ---- check sam_shape
+    # check sam_shape
 
     sam_shape = args.sam_shape
     if sam_shape is not None:
@@ -233,7 +233,7 @@ def _setup_argparse():
         else:
             parser.error(f"`--sam_shape` must be given one or three integers, not {args.sam_shape}!")
 
-    # ---- construct `args` using `gen_lib`, which sets up the output directories
+    # construct `args` using `gen_lib`, which sets up the output directories
 
     argv = [
         param_space, args.output,
@@ -251,11 +251,11 @@ def _setup_argparse():
         argv.append('--recreate')
 
     # NOTE: `sam_shape` is set afterwards, as `gen_lib` only accepts a single integer
-    args = gen_lib._setup_argparse(argv)
-    args.sam_shape = sam_shape
-    args.max_failures = args.max_failures
+    args_out = gen_lib._setup_argparse(argv)
+    args_out.sam_shape = sam_shape
+    args_out.max_failures = args.max_failures
 
-    return args
+    return args_out
 
 
 def mpiabort_excepthook(type, value, traceback):
